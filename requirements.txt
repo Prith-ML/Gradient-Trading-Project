@@ -1,0 +1,13 @@
+# Twitter/X Data Pipeline - Dependencies
+
+# Database
+psycopg2-binary>=2.9.9
+
+# Twitter API
+tweepy>=4.14.0
+
+# Configuration
+python-dotenv>=1.0.0
+
+# Date/Time
+python-dateutil>=2.8.2

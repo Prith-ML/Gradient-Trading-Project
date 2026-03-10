@@ -1,0 +1,20 @@
+# Environment and secrets
+.env
+*.pem
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+venv/
+.venv/
+
+# Pipeline runtime
+pipeline_checkpoint.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
