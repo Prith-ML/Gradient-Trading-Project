@@ -13,6 +13,9 @@ venv/
 # Pipeline runtime
 pipeline_checkpoint.json
 
+# USPTO downloads (large)
+uspto_data_downloads/
+
 # IDE
 .idea/
 .vscode/
