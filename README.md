@@ -1,87 +1,53 @@
 # Gradient-Trading-Project
 
-## Overview
+USPTO patent data pipeline. Downloads patent data from PatentsView and loads it into PostgreSQL. **Free, no API key required.**
 
-A comprehensive trading system leveraging gradient-based optimization and social media signals (Twitter/X) for financial market analysis. Includes a **Twitter data pipeline** that fetches 500,000 tweets and stores them in PostgreSQL.
+## About
 
-## Twitter Data Pipeline
+This project builds a data pipeline for **USPTO patent data**—granted patents, applications, inventors, and assignees. Data comes from [PatentsView](https://patentsview.org/), a free, government-backed source. The pipeline downloads bulk TSV files, parses them, and loads them into a normalized PostgreSQL schema for querying and analysis. Use cases include innovation research, competitive intelligence, and patent landscape analysis.
 
-Data pipeline for fetching **500,000 tweets** from X (Twitter) API v2 and storing them in a local PostgreSQL database.
+## Quick Start
 
-### Features
+```bash
+pip install -r requirements.txt
+cp .env.example .env
+# Edit .env: set DB_PASSWORD and DB_PORT (default 5433)
+```
 
-- **Twitter API v2** integration via `tweepy`
-- **PostgreSQL** schema with normalized tables
-- **Checkpoint/resume** for long-running ingestion
-- **Rate limiting** to respect API limits
-- **Documented schema** and hardware requirements
+```bash
+python scripts/setup_uspto_db.py
+python -m uspto.pipeline
+```
 
-### Quick Start
+~10 min to load 10k patents + applications.
 
-1. **Prerequisites**: Python 3.9+, PostgreSQL 12+, X Developer account (Basic tier or higher for 500k tweets)
+## Verify
 
-2. **Create Database**:
-   ```bash
-   psql -U postgres -c "CREATE DATABASE twitter_data;"
-   ```
+```sql
+SELECT patent_id, patent_title, patent_date FROM patents LIMIT 20;
+```
 
-3. **Install & Configure**:
-   ```bash
-   pip install -r requirements.txt
-   cp .env.example .env
-   # Edit .env: set TWITTER_BEARER_TOKEN and DB_PASSWORD
-   ```
-
-4. **Initialize Schema**:
-   ```bash
-   python scripts/setup_db.py
-   ```
-
-5. **Run Pipeline**:
-   ```bash
-   python pipeline.py
-   ```
-
-### Project Structure
+## Project Structure
 
 ```
-.
-├── config.py              # Configuration (env vars)
-├── pipeline.py            # Main pipeline entry point
-├── etl/
-│   └── twitter_etl.py     # ETL logic for DB writes
+uspto/
+├── pipeline.py           # Download + load
+├── config.py             # Settings
 ├── database/
-│   ├── twitter_schema.sql # PostgreSQL schema
-│   └── SCHEMA_DOCUMENTATION.md
-├── scripts/
-│   ├── setup_db.py        # Apply schema
-│   └── create_database.sql
-├── .env.example
-├── requirements.txt
+│   └── uspto_schema.sql  # Schema
 ├── HARDWARE_REQUIREMENTS.md
 └── README.md
+scripts/
+└── setup_uspto_db.py     # Create DB + schema
 ```
 
-### Configuration
+## Config
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `TWITTER_BEARER_TOKEN` | — | X API Bearer token (required) |
-| `DB_HOST` | localhost | PostgreSQL host |
-| `TARGET_TWEET_COUNT` | 500000 | Target number of tweets |
-| `SEARCH_QUERY` | lang:en -is:retweet -is:reply | Search query |
-| `REQUESTS_PER_WINDOW` | 60 | API requests per 15 min (Basic tier) |
+| Variable | Default |
+|----------|---------|
+| `DB_PASSWORD` | — |
+| `DB_PORT` | 5433 |
+| `USPTO_MAX_PATENTS` | 10000 |
+| `USPTO_QUICK_MODE` | 1 (patents + applications only) |
 
-### Hardware Requirements
-
-See **[HARDWARE_REQUIREMENTS.md](HARDWARE_REQUIREMENTS.md)** for CPU, RAM, disk, network, and time estimates.
-
-### Schema
-
-See **[database/SCHEMA_DOCUMENTATION.md](database/SCHEMA_DOCUMENTATION.md)** for table descriptions and example queries.
-
-### API Notes
-
-- **Search Recent** (`/2/tweets/search/recent`) returns tweets from the **last 7 days** only.
-- For 500k tweets you need **Basic** ($100/mo) or **Pro** tier.
-- Free tier: 1,500 tweets/month (not sufficient for 500k).
+Set `USPTO_QUICK_MODE=0` and `USPTO_MAX_PATENTS=0` for full load (2–5 hrs).
