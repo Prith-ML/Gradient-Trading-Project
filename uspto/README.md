@@ -20,7 +20,8 @@ python -m uspto.pipeline
 ## Data Loaded
 
 **Quick mode (default):** 10k patents + 10k applications (~10 min)  
-**Full mode:** Set `USPTO_QUICK_MODE=0` and `USPTO_MAX_PATENTS=0` for full dataset.
+**Full mode:** Set `USPTO_QUICK_MODE=0` and `USPTO_MAX_PATENTS=0` for full dataset.  
+**10M load:** Set `USPTO_MAX_PATENTS=10000000` and `USPTO_QUICK_MODE=0` to load ~10M patents (~2–5 hrs).
 
 | Table | Source | Default (quick) | Full |
 |-------|--------|-----------------|------|
@@ -29,9 +30,29 @@ python -m uspto.pipeline
 | inventors | g_inventor_disambiguated | — | 24M |
 | assignees | g_assignee_disambiguated | — | 10.6M |
 
+## Speed Tuning
+
+For faster loads, increase batch size in `.env`:
+- `USPTO_BATCH_SIZE=50000` – fewer commits, faster inserts (uses more RAM)
+- `USPTO_DOWNLOAD_CHUNK_SIZE=524288` – faster downloads (512KB chunks)
+
+## Incremental Updates
+
+When PatentsView publishes new bulk data, run the update:
+
+```bash
+python scripts/run_uspto_update.py
+```
+
+This forces re-download and inserts only new records (existing rows are skipped). For scheduled syncs, use Windows Task Scheduler or `scripts/schedule_uspto_updates.py`.
+
 ## Schema
 
 See `uspto/database/uspto_schema.sql`. Core tables: `patents`, `applications`, `inventors`, `assignees`, `patent_inventors`, `patent_assignees`, `locations`, `patent_cpc`.
+
+## Usage
+
+See **`uspto/USPTO_USAGE.md`** for exploration queries, update setup, and how the sync works.
 
 ## Hardware
 

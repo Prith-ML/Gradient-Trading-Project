@@ -11,6 +11,7 @@ import zipfile
 from pathlib import Path
 
 import psycopg2
+from psycopg2.extras import execute_values
 import requests
 
 from uspto.config import USPTOConfig
@@ -36,14 +37,14 @@ DATASETS_QUICK = [
 ]
 
 
-def download_file(url: str, dest: Path) -> Path:
-    """Download file with progress."""
+def download_file(url: str, dest: Path, chunk_size: int = 262144) -> Path:
+    """Download file with progress. Larger chunk_size = faster downloads."""
     logger.info("Downloading %s...", url)
     r = requests.get(url, stream=True)
     r.raise_for_status()
     dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "wb") as f:
-        for chunk in r.iter_content(chunk_size=8192):
+        for chunk in r.iter_content(chunk_size=chunk_size):
             f.write(chunk)
     logger.info("Saved to %s", dest)
     return dest
@@ -106,10 +107,12 @@ def load_patents(conn, zip_path: Path, batch_size: int, max_rows: int = 0) -> in
                 (row.get("filename") or "")[:120],
             ))
             if len(batch) >= batch_size:
-                cur.executemany(
+                execute_values(
+                    cur,
                     """INSERT INTO patents (patent_id, patent_type, patent_date, patent_title, wipo_kind, num_claims, withdrawn, filename)
-                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (patent_id) DO NOTHING""",
+                       VALUES %s ON CONFLICT (patent_id) DO NOTHING""",
                     batch,
+                    page_size=batch_size,
                 )
                 count += len(batch)
                 conn.commit()
@@ -120,10 +123,12 @@ def load_patents(conn, zip_path: Path, batch_size: int, max_rows: int = 0) -> in
             continue
 
     if batch:
-        cur.executemany(
+        execute_values(
+            cur,
             """INSERT INTO patents (patent_id, patent_type, patent_date, patent_title, wipo_kind, num_claims, withdrawn, filename)
-               VALUES (%s, %s, %s, %s, %s, %s, %s, %s) ON CONFLICT (patent_id) DO NOTHING""",
+               VALUES %s ON CONFLICT (patent_id) DO NOTHING""",
             batch,
+            page_size=batch_size,
         )
         count += len(batch)
         conn.commit()
@@ -154,10 +159,12 @@ def load_applications(conn, zip_path: Path, batch_size: int, patent_ids: set, ma
                 safe_int(row.get("rule_47_flag")),
             ))
             if len(batch) >= batch_size:
-                cur.executemany(
+                execute_values(
+                    cur,
                     """INSERT INTO applications (application_id, patent_id, patent_application_type, filing_date, series_code, rule_47_flag)
-                       VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (application_id) DO NOTHING""",
+                       VALUES %s ON CONFLICT (application_id) DO NOTHING""",
                     batch,
+                    page_size=batch_size,
                 )
                 count += len(batch)
                 conn.commit()
@@ -168,10 +175,12 @@ def load_applications(conn, zip_path: Path, batch_size: int, patent_ids: set, ma
             continue
 
     if batch:
-        cur.executemany(
+        execute_values(
+            cur,
             """INSERT INTO applications (application_id, patent_id, patent_application_type, filing_date, series_code, rule_47_flag)
-               VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (application_id) DO NOTHING""",
+               VALUES %s ON CONFLICT (application_id) DO NOTHING""",
             batch,
+            page_size=batch_size,
         )
         count += len(batch)
         conn.commit()
@@ -205,15 +214,19 @@ def load_inventors(conn, zip_path: Path, batch_size: int, patent_ids: set, max_r
             ))
             link_batch.append((patent_id[:20], inventor_id[:128], seq))
             if len(inv_batch) >= batch_size:
-                cur.executemany(
+                execute_values(
+                    cur,
                     """INSERT INTO inventors (inventor_id, disambig_inventor_name_first, disambig_inventor_name_last, gender_code, location_id)
-                       VALUES (%s, %s, %s, %s, %s) ON CONFLICT (inventor_id) DO NOTHING""",
+                       VALUES %s ON CONFLICT (inventor_id) DO NOTHING""",
                     inv_batch,
+                    page_size=batch_size,
                 )
-                cur.executemany(
+                execute_values(
+                    cur,
                     """INSERT INTO patent_inventors (patent_id, inventor_id, inventor_sequence)
-                       VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
+                       VALUES %s ON CONFLICT DO NOTHING""",
                     link_batch,
+                    page_size=batch_size,
                 )
                 inv_count += len(inv_batch)
                 link_count += len(link_batch)
@@ -225,15 +238,19 @@ def load_inventors(conn, zip_path: Path, batch_size: int, patent_ids: set, max_r
             continue
 
     if inv_batch:
-        cur.executemany(
+        execute_values(
+            cur,
             """INSERT INTO inventors (inventor_id, disambig_inventor_name_first, disambig_inventor_name_last, gender_code, location_id)
-               VALUES (%s, %s, %s, %s, %s) ON CONFLICT (inventor_id) DO NOTHING""",
+               VALUES %s ON CONFLICT (inventor_id) DO NOTHING""",
             inv_batch,
+            page_size=batch_size,
         )
-        cur.executemany(
+        execute_values(
+            cur,
             """INSERT INTO patent_inventors (patent_id, inventor_id, inventor_sequence)
-               VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
+               VALUES %s ON CONFLICT DO NOTHING""",
             link_batch,
+            page_size=batch_size,
         )
         inv_count += len(inv_batch)
         link_count += len(link_batch)
@@ -269,16 +286,20 @@ def load_assignees(conn, zip_path: Path, batch_size: int, patent_ids: set, max_r
             ))
             link_batch.append((patent_id[:20], assignee_id[:36], seq))
             if len(asn_batch) >= batch_size:
-                cur.executemany(
+                execute_values(
+                    cur,
                     """INSERT INTO assignees (assignee_id, disambig_assignee_individual_name_first, disambig_assignee_individual_name_last,
                        disambig_assignee_organization, assignee_type, location_id)
-                       VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (assignee_id) DO NOTHING""",
+                       VALUES %s ON CONFLICT (assignee_id) DO NOTHING""",
                     asn_batch,
+                    page_size=batch_size,
                 )
-                cur.executemany(
+                execute_values(
+                    cur,
                     """INSERT INTO patent_assignees (patent_id, assignee_id, assignee_sequence)
-                       VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
+                       VALUES %s ON CONFLICT DO NOTHING""",
                     link_batch,
+                    page_size=batch_size,
                 )
                 asn_count += len(asn_batch)
                 link_count += len(link_batch)
@@ -290,16 +311,20 @@ def load_assignees(conn, zip_path: Path, batch_size: int, patent_ids: set, max_r
             continue
 
     if asn_batch:
-        cur.executemany(
+        execute_values(
+            cur,
             """INSERT INTO assignees (assignee_id, disambig_assignee_individual_name_first, disambig_assignee_individual_name_last,
                disambig_assignee_organization, assignee_type, location_id)
-               VALUES (%s, %s, %s, %s, %s, %s) ON CONFLICT (assignee_id) DO NOTHING""",
+               VALUES %s ON CONFLICT (assignee_id) DO NOTHING""",
             asn_batch,
+            page_size=batch_size,
         )
-        cur.executemany(
+        execute_values(
+            cur,
             """INSERT INTO patent_assignees (patent_id, assignee_id, assignee_sequence)
-               VALUES (%s, %s, %s) ON CONFLICT DO NOTHING""",
+               VALUES %s ON CONFLICT DO NOTHING""",
             link_batch,
+            page_size=batch_size,
         )
         asn_count += len(asn_batch)
         link_count += len(link_batch)
@@ -344,8 +369,11 @@ def run_pipeline():
         url = f"{cfg.PATENTSVIEW_BASE}/{filename}"
         zip_path = data_dir / filename
         try:
+            if cfg.FORCE_REFRESH and zip_path.exists():
+                zip_path.unlink()
+                logger.info("Removed cached %s (force refresh)", filename)
             if not zip_path.exists():
-                download_file(url, zip_path)
+                download_file(url, zip_path, chunk_size=cfg.DOWNLOAD_CHUNK_SIZE)
             cur = conn.cursor()
             cur.execute(
                 """INSERT INTO uspto_ingestion_runs (started_at, source_url, table_name, status)

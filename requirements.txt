@@ -14,3 +14,6 @@ python-dateutil>=2.8.2
 
 # HTTP (USPTO pipeline)
 requests>=2.28.0
+
+# Scheduler (USPTO periodic updates)
+schedule>=1.2.0

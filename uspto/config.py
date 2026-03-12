@@ -22,14 +22,19 @@ class USPTOConfig:
 
     # Download
     DATA_DIR: str = os.getenv("USPTO_DATA_DIR", "uspto_data_downloads")
-    BATCH_SIZE: int = int(os.getenv("USPTO_BATCH_SIZE", "5000"))
+    DOWNLOAD_CHUNK_SIZE: int = int(os.getenv("USPTO_DOWNLOAD_CHUNK_SIZE", "262144"))  # 256KB for faster downloads
+    BATCH_SIZE: int = int(os.getenv("USPTO_BATCH_SIZE", "25000"))  # Larger batches = fewer commits = faster
 
     # Row limits (set to 0 for full load). 10k patents ~10 min in quick mode.
+    # Use USPTO_MAX_PATENTS=10000000 for ~10M patent load (2-5 hrs full mode).
     MAX_PATENTS: int = int(os.getenv("USPTO_MAX_PATENTS", "10000"))
     MAX_INVENTORS: int = int(os.getenv("USPTO_MAX_INVENTORS", "50000"))
     MAX_ASSIGNEES: int = int(os.getenv("USPTO_MAX_ASSIGNEES", "25000"))
     # Quick mode: only patents + applications (~15 min). Skip inventors/assignees (huge files).
+    # Set USPTO_QUICK_MODE=0 for full load (patents + applications + inventors + assignees).
     QUICK_MODE: bool = os.getenv("USPTO_QUICK_MODE", "1").lower() in ("1", "true", "yes")
+    # Force re-download of bulk files (for incremental updates). Use when running scheduled sync.
+    FORCE_REFRESH: bool = os.getenv("USPTO_FORCE_REFRESH", "0").lower() in ("1", "true", "yes")
 
     # PatentsView S3 base URL
     PATENTSVIEW_BASE = "https://s3.amazonaws.com/data.patentsview.org/download"
